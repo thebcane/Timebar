@@ -1,0 +1,32 @@
+[package]
+name = "timebar"
+version = "0.1.0"
+description = "TimeBar — a menu-bar time tracker"
+authors = ["you"]
+edition = "2021"
+
+[lib]
+# The `_lib` suffix keeps the lib name unique from the bin name (Windows).
+name = "timebar_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = ["tray-icon", "image-png", "macos-private-api"] }
+tauri-plugin-opener = "2"
+tauri-plugin-positioner = { version = "2", features = ["tray-icon"] }
+tauri-plugin-global-shortcut = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio", "sqlite", "macros", "migrate"] }
+tokio = { version = "1", features = ["full"] }
+uuid = { version = "1", features = ["v4"] }
+chrono = { version = "0.4", features = ["clock"] }
+chrono-tz = "0.10"
+thiserror = "2"
+csv = "1"
+# native-tls uses macOS Security.framework — far smaller to compile than
+# bundling rustls (no ring/aws-lc C build).
+reqwest = { version = "0.12", default-features = false, features = ["json", "native-tls"] }

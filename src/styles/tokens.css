@@ -1,0 +1,88 @@
+/*
+ * Design tokens — Section 9 of the build brief.
+ * Dark theme only in v1. These CSS variables are the single source of truth
+ * for color; tailwind.config.ts maps them into utility classes.
+ */
+:root {
+  /* Surfaces */
+  --app-bg: #0e1116;
+  --panel: #151a21;
+  --panel-raised: #1c222b;
+  --sidebar: #101826;
+  --sidebar-grad: linear-gradient(180deg, #101826, #0c121c);
+  --hairline: rgba(255, 255, 255, 0.06);
+  --overlay: rgba(0, 0, 0, 0.35);
+
+  /* Text */
+  --text-primary: #f2f5f8;
+  --text-secondary: #8a93a0;
+  --text-muted: #5a626e;
+
+  /* Accent — the running identity */
+  --accent: #2cc7c4;
+  --accent-bright: #34d3cf;
+  --accent-grad: linear-gradient(90deg, #15a8a5, #1fbeb8);
+
+  /* Task color palette */
+  --task-teal: #2dd4bf;
+  --task-cyan: #38bdf8;
+  --task-blue: #3b82f6;
+  --task-purple: #8b5cf6;
+  --task-magenta: #a855f7;
+  --task-pink: #ec4899;
+  --task-lime: #84cc16;
+  --task-green: #22c55e;
+  --task-amber: #f59e0b;
+  --task-orange: #fb923c;
+
+  color-scheme: dark;
+}
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
+  body {
+    margin: 0;
+    background: var(--app-bg);
+    color: var(--text-primary);
+    font-family: theme("fontFamily.sans");
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    overflow: hidden;
+  }
+
+  /* Tabular figures everywhere numbers tick or align. */
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Visible keyboard focus rings (Section 9 quality floor). */
+  :focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+
+  .eyebrow {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-muted);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
