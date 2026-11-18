@@ -89,8 +89,37 @@ security enabled with per-user policies — see
 [`supabase/schema.sql`](supabase/schema.sql). Never put a `service_role` key in
 this repo.
 
-To point at your own Supabase project, apply `supabase/schema.sql` to it and update
-`SUPABASE_URL` and `ANON_KEY` in `sync.rs`.
+To point at your own Supabase project, apply `supabase/schema.sql` and then
+`supabase/migrations/20261118_sync_v2.sql` to it, and update `SUPABASE_URL` and
+`ANON_KEY` in `sync.rs`.
+
+### How sync works
+
+- Every local write marks the row `dirty`; each cycle pushes dirty rows and clears
+  the flag. Writes also trigger a sync within about a second, and a background
+  cycle runs every 4 seconds.
+- The server stamps each accepted write with a `server_seq` number. Devices pull
+  everything above the last number they saw, so a device with a wrong clock
+  can't cause missed changes.
+- Conflicts are last-write-wins by `updated_at`, enforced on the server too: a
+  push older than the stored row is ignored. Local edits always move
+  `updated_at` forward, even on a device whose clock is behind.
+- Only one timer runs at a time across all devices. If two devices start timers
+  before syncing, the one started last wins and the other ends when it started.
+- Sample data from a fresh install is discarded on first sign-in if you haven't
+  used it, so it never reaches your other devices.
+
+### Testing sync with two copies on one machine
+
+`TIMEBAR_DATA_DIR` points the app at a different database. With `npm run tauri dev`
+running, start a second copy as another "device":
+
+```bash
+TIMEBAR_DATA_DIR=/tmp/timebar-device-2 ./src-tauri/target/debug/timebar
+```
+
+Sign both in to the same account. `cargo test` in `src-tauri` covers the local
+half of sync (dirty tracking, clock skew, the one-running-timer rule, seed cleanup).
 
 ## Project layout
 

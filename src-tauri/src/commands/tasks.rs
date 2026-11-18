@@ -54,6 +54,7 @@ pub async fn create_folder(
     .execute(&db.pool)
     .await
     .map_err(e)?;
+    crate::sync::nudge();
     Ok(folder)
 }
 
@@ -88,7 +89,7 @@ pub async fn update_folder(
     f.updated_at = now_ms();
 
     sqlx::query(
-        "UPDATE folders SET name=?, color=?, parent_id=?, sort_order=?, archived=?, updated_at=? WHERE id=?",
+        "UPDATE folders SET name=?, color=?, parent_id=?, sort_order=?, archived=?, updated_at=?, dirty=1 WHERE id=?",
     )
     .bind(&f.name)
     .bind(&f.color)
@@ -100,6 +101,7 @@ pub async fn update_folder(
     .execute(&db.pool)
     .await
     .map_err(e)?;
+    crate::sync::nudge();
     Ok(f)
 }
 
@@ -110,38 +112,40 @@ pub async fn update_folder(
 pub async fn delete_folder(db: State<'_, Db>, id: String) -> CmdResult<()> {
     let now = now_ms();
     let mut tx = db.pool.begin().await.map_err(e)?;
-    sqlx::query("UPDATE folders SET deleted_at=?, updated_at=? WHERE id=?")
+    sqlx::query("UPDATE folders SET deleted_at=?, updated_at=?, dirty=1 WHERE id=?")
         .bind(now)
         .bind(now)
         .bind(&id)
         .execute(&mut *tx)
         .await
         .map_err(e)?;
-    sqlx::query("UPDATE tasks SET folder_id=NULL, updated_at=? WHERE folder_id=?")
+    sqlx::query("UPDATE tasks SET folder_id=NULL, updated_at=?, dirty=1 WHERE folder_id=?")
         .bind(now)
         .bind(&id)
         .execute(&mut *tx)
         .await
         .map_err(e)?;
-    sqlx::query("UPDATE folders SET parent_id=NULL, updated_at=? WHERE parent_id=?")
+    sqlx::query("UPDATE folders SET parent_id=NULL, updated_at=?, dirty=1 WHERE parent_id=?")
         .bind(now)
         .bind(&id)
         .execute(&mut *tx)
         .await
         .map_err(e)?;
     tx.commit().await.map_err(e)?;
+    crate::sync::nudge();
     Ok(())
 }
 
 #[tauri::command]
 pub async fn archive_folder(db: State<'_, Db>, id: String, archived: bool) -> CmdResult<()> {
-    sqlx::query("UPDATE folders SET archived=?, updated_at=? WHERE id=?")
+    sqlx::query("UPDATE folders SET archived=?, updated_at=?, dirty=1 WHERE id=?")
         .bind(archived)
         .bind(now_ms())
         .bind(&id)
         .execute(&db.pool)
         .await
         .map_err(e)?;
+    crate::sync::nudge();
     Ok(())
 }
 
@@ -204,6 +208,7 @@ pub async fn create_task(
     .execute(&db.pool)
     .await
     .map_err(e)?;
+    crate::sync::nudge();
     Ok(task)
 }
 
@@ -244,7 +249,7 @@ pub async fn update_task(db: State<'_, Db>, id: String, patch: TaskPatch) -> Cmd
     t.updated_at = now_ms();
 
     sqlx::query(
-        "UPDATE tasks SET name=?, color=?, folder_id=?, hourly_rate=?, currency=?, billable=?, sort_order=?, archived=?, updated_at=? WHERE id=?",
+        "UPDATE tasks SET name=?, color=?, folder_id=?, hourly_rate=?, currency=?, billable=?, sort_order=?, archived=?, updated_at=?, dirty=1 WHERE id=?",
     )
     .bind(&t.name)
     .bind(&t.color)
@@ -265,7 +270,7 @@ pub async fn update_task(db: State<'_, Db>, id: String, patch: TaskPatch) -> Cmd
     // the fact). `updated_at` bumps so the change syncs across devices.
     if (t.hourly_rate - old_rate).abs() > f64::EPSILON {
         sqlx::query(
-            "UPDATE sessions SET rate_snapshot=?, updated_at=? WHERE task_id=? AND deleted_at IS NULL",
+            "UPDATE sessions SET rate_snapshot=?, updated_at=?, dirty=1 WHERE task_id=? AND deleted_at IS NULL",
         )
         .bind(t.hourly_rate)
         .bind(t.updated_at)
@@ -275,18 +280,20 @@ pub async fn update_task(db: State<'_, Db>, id: String, patch: TaskPatch) -> Cmd
         .map_err(e)?;
     }
 
+    crate::sync::nudge();
     Ok(t)
 }
 
 #[tauri::command]
 pub async fn archive_task(db: State<'_, Db>, id: String, archived: bool) -> CmdResult<()> {
-    sqlx::query("UPDATE tasks SET archived=?, updated_at=? WHERE id=?")
+    sqlx::query("UPDATE tasks SET archived=?, updated_at=?, dirty=1 WHERE id=?")
         .bind(archived)
         .bind(now_ms())
         .bind(&id)
         .execute(&db.pool)
         .await
         .map_err(e)?;
+    crate::sync::nudge();
     Ok(())
 }
 
@@ -296,14 +303,14 @@ pub async fn archive_task(db: State<'_, Db>, id: String, archived: bool) -> CmdR
 pub async fn delete_task(db: State<'_, Db>, id: String) -> CmdResult<()> {
     let now = now_ms();
     let mut tx = db.pool.begin().await.map_err(e)?;
-    sqlx::query("UPDATE tasks SET deleted_at=?, updated_at=? WHERE id=?")
+    sqlx::query("UPDATE tasks SET deleted_at=?, updated_at=?, dirty=1 WHERE id=?")
         .bind(now)
         .bind(now)
         .bind(&id)
         .execute(&mut *tx)
         .await
         .map_err(e)?;
-    sqlx::query("UPDATE sessions SET deleted_at=?, updated_at=? WHERE task_id=? AND deleted_at IS NULL")
+    sqlx::query("UPDATE sessions SET deleted_at=?, updated_at=?, dirty=1 WHERE task_id=? AND deleted_at IS NULL")
         .bind(now)
         .bind(now)
         .bind(&id)
@@ -311,6 +318,7 @@ pub async fn delete_task(db: State<'_, Db>, id: String) -> CmdResult<()> {
         .await
         .map_err(e)?;
     tx.commit().await.map_err(e)?;
+    crate::sync::nudge();
     Ok(())
 }
 
@@ -325,7 +333,7 @@ pub async fn reorder(db: State<'_, Db>, entity: String, ordered_ids: Vec<String>
     let now = now_ms();
     let mut tx = db.pool.begin().await.map_err(e)?;
     for (i, id) in ordered_ids.iter().enumerate() {
-        let sql = format!("UPDATE {table} SET sort_order=?, updated_at=? WHERE id=?");
+        let sql = format!("UPDATE {table} SET sort_order=?, updated_at=?, dirty=1 WHERE id=?");
         sqlx::query(&sql)
             .bind(i as i64)
             .bind(now)
@@ -335,5 +343,6 @@ pub async fn reorder(db: State<'_, Db>, entity: String, ordered_ids: Vec<String>
             .map_err(e)?;
     }
     tx.commit().await.map_err(e)?;
+    crate::sync::nudge();
     Ok(())
 }

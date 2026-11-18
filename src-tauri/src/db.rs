@@ -100,6 +100,7 @@ impl Db {
             ("Side project", "#EC4899", Some(&personal), 0.0, false),
         ];
         let mut task_ids = Vec::new();
+        let mut seed_task_ids: Vec<String> = Vec::new();
         for (i, (name, color, folder, rate, billable)) in task_defs.iter().enumerate() {
             let tid = id();
             sqlx::query(
@@ -117,6 +118,7 @@ impl Db {
             .bind(now)
             .execute(&self.pool)
             .await?;
+            seed_task_ids.push(tid.clone());
             task_ids.push((tid, *rate));
         }
 
@@ -139,17 +141,20 @@ impl Db {
             (1, 0, 15, 65, Some("Design review")),
         ];
         // Anchor to local midnight of today so seed data lands on real days.
+        let mut seed_session_ids: Vec<String> = Vec::new();
         for (back, ti, hour, mins, note) in session_defs {
             let (tid, rate) = &task_ids[ti];
             let day_start = now - (now % DAY); // rough UTC midnight; fine for dev seed
             let start = day_start - back * DAY + hour * HOUR;
             let end = start + mins * 60_000;
             let billable_rate = *rate;
+            let sid = id();
+            seed_session_ids.push(sid.clone());
             sqlx::query(
                 "INSERT INTO sessions (id, task_id, started_at, ended_at, note, rate_snapshot, billed, source, created_at, updated_at)
                  VALUES (?, ?, ?, ?, ?, ?, 0, 'timer', ?, ?)",
             )
-            .bind(id())
+            .bind(&sid)
             .bind(tid)
             .bind(start)
             .bind(end)
@@ -160,6 +165,20 @@ impl Db {
             .execute(&self.pool)
             .await?;
         }
+
+        // Remember what was seeded, so the first sync sign-in can drop the
+        // sample data instead of uploading it to every device (see
+        // sync::discard_unused_seed).
+        let manifest = serde_json::json!({
+            "seeded_at": now,
+            "folders": [client, personal],
+            "tasks": seed_task_ids,
+            "sessions": seed_session_ids,
+        });
+        sqlx::query("INSERT OR REPLACE INTO settings (key, value) VALUES ('seed_manifest', ?)")
+            .bind(manifest.to_string())
+            .execute(&self.pool)
+            .await?;
 
         Ok(())
     }
