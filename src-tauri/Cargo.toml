@@ -4,6 +4,8 @@ version = "0.1.0"
 description = "TimeBar — a menu-bar time tracker"
 authors = ["you"]
 edition = "2021"
+# Tauri 2.12 needs Rust 1.90+. If the build says rustc is too old: rustup update stable
+rust-version = "1.90"
 
 [lib]
 # The `_lib` suffix keeps the lib name unique from the bin name (Windows).
