@@ -22,7 +22,8 @@ export function Sidebar({
 }) {
   return (
     <div className="flex w-[200px] shrink-0 flex-col bg-sidebar-grad">
-      <div data-tauri-drag-region className="h-10 shrink-0" />
+      {/* Room for the macOS traffic lights; shorter on Windows (tokens.css). */}
+      <div data-tauri-drag-region className="titlebar-spacer h-10 shrink-0" />
       <nav className="flex flex-col gap-1 px-3">
         {NAV.map(({ key, label, icon: Icon }) => {
           const active = key === section;

@@ -6,16 +6,24 @@ use crate::db::Db;
 use crate::models::Settings;
 use std::collections::HashMap;
 use tauri::{AppHandle, State};
+use tauri_plugin_autostart::ManagerExt;
 use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut};
 
-/// The quick-panel toggle shortcut (Cmd+Shift+T). Kept here so registration and
-/// the runtime enable/disable command stay in sync.
+/// The quick-panel toggle shortcut. Kept here so registration, the key
+/// handler and the enable/disable command stay in sync.
+///
+/// macOS: Cmd+Shift+T. Windows/Linux: Ctrl+Alt+T (Win+Shift+T belongs to
+/// Windows, and Ctrl+Shift+T is "reopen closed tab" in every browser).
 pub fn quick_toggle_shortcut() -> Shortcut {
-    Shortcut::new(Some(Modifiers::SUPER | Modifiers::SHIFT), Code::KeyT)
+    if cfg!(target_os = "macos") {
+        Shortcut::new(Some(Modifiers::SUPER | Modifiers::SHIFT), Code::KeyT)
+    } else {
+        Shortcut::new(Some(Modifiers::CONTROL | Modifiers::ALT), Code::KeyT)
+    }
 }
 
 #[tauri::command]
-pub async fn get_settings(db: State<'_, Db>) -> CmdResult<Settings> {
+pub async fn get_settings(app: AppHandle, db: State<'_, Db>) -> CmdResult<Settings> {
     let rows: Vec<(String, String)> = sqlx::query_as("SELECT key, value FROM settings")
         .fetch_all(&db.pool)
         .await
@@ -42,6 +50,7 @@ pub async fn get_settings(db: State<'_, Db>) -> CmdResult<Settings> {
         theme: map.get("theme").cloned().unwrap_or_else(|| "dark".into()),
         // Default on when unset.
         global_shortcut_enabled: map.get("global_shortcut_enabled").map(|v| v != "0").unwrap_or(true),
+        launch_at_login: app.autolaunch().is_enabled().unwrap_or(false),
     })
 }
 
@@ -78,4 +87,16 @@ pub async fn set_global_shortcut(app: AppHandle, db: State<'_, Db>, enabled: boo
         let _ = app.global_shortcut().unregister(sc);
     }
     Ok(())
+}
+
+/// Turn "start TimeBar when you log in" on or off. Stored by the OS (a login
+/// item on macOS, a Run registry entry on Windows), so it's per machine.
+#[tauri::command]
+pub fn set_launch_at_login(app: AppHandle, enabled: bool) -> CmdResult<()> {
+    let launcher = app.autolaunch();
+    if enabled {
+        launcher.enable().map_err(e)
+    } else {
+        launcher.disable().map_err(e)
+    }
 }

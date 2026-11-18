@@ -86,3 +86,9 @@
     transition-duration: 0.01ms !important;
   }
 }
+
+/* Windows keeps its native title bar, so the sidebar doesn't need to leave
+   room for the macOS traffic lights. */
+.platform-windows .titlebar-spacer {
+  height: 0.75rem;
+}

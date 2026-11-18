@@ -4,6 +4,9 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import QuickPanel from "./windows/QuickPanel";
 import MainWindow from "./windows/MainWindow";
 import "./styles/tokens.css";
+import { applyPlatformClass } from "./lib/platform";
+
+applyPlatformClass();
 
 // One Vite build, two windows: pick the surface by window label (Section 10).
 const label = getCurrentWindow().label;

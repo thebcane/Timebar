@@ -1,6 +1,6 @@
 # TimeBar
 
-A macOS menu-bar time tracker. Start and stop tasks from the menu bar, organize
+A menu-bar (macOS) and system-tray (Windows) time tracker. Start and stop tasks from the menu bar, organize
 them into folders, and review everything in a dashboard with a day/week timeline
 and billing reports.
 
@@ -30,7 +30,8 @@ These are system-level and not installed by `npm install`:
 | --- | --- |
 | **Node** | 20.19+ or 22.12+ (Vite 7 requirement) |
 | **Rust** | Install via [rustup](https://rustup.rs) |
-| **Xcode Command Line Tools** | `xcode-select --install` — provides the C toolchain and WebKit headers |
+| **Xcode Command Line Tools** (macOS) | `xcode-select --install` — provides the C toolchain and WebKit headers |
+| **VS Build Tools** (Windows) | "Desktop development with C++" workload — see Platform support |
 
 ## Getting started
 
@@ -162,7 +163,34 @@ repository itself stays under 1 MB.
 
 ## Platform support
 
-macOS only as configured. [`src-tauri/Cargo.toml`](src-tauri/Cargo.toml) enables
-Tauri's `macos-private-api` feature, and the tray and quick-panel positioning are
-tuned for macOS. Windows and Linux would build but need layout work; Linux also
-needs the WebKitGTK system packages.
+macOS and Windows, from the same code.
+
+| | macOS | Windows |
+| --- | --- | --- |
+| Where it lives | Menu bar, no Dock icon | System tray (may start in the ^ overflow; drag it onto the taskbar to keep it visible) |
+| Running timer | `H:MM:SS` next to the icon | Icon turns teal; hover for task and elapsed time |
+| Quick panel | Opens under the icon | Opens above the icon |
+| Shortcut | `Cmd+Shift+T` | `Ctrl+Alt+T` |
+| Title bar | Hidden, content runs under it | Native Windows title bar |
+
+Windows-only window settings live in `src-tauri/tauri.windows.conf.json`, which
+Tauri merges over `tauri.conf.json` when building for Windows. Its `windows`
+array replaces the base one wholesale, so a change to either window's size or
+behavior needs making in both files.
+
+### Windows prerequisites
+
+- [Rust](https://rustup.rs) (MSVC toolchain, the default)
+- Visual Studio Build Tools with the **Desktop development with C++** workload
+- Node 20.19+ or 22.12+
+- WebView2, already part of Windows 10 and 11
+
+Then `npm install` and `npm run tauri dev`, same as on the Mac.
+
+### Installers
+
+Push a tag like `v0.2.0` and GitHub Actions builds a `.dmg` and Windows `.msi`/`.exe`
+onto a draft release (`.github/workflows/release.yml`). Builds are unsigned: on
+macOS right-click → Open the first time; on Windows SmartScreen asks you to click
+More info → Run anyway. Every push also runs the tests on both systems
+(`.github/workflows/check.yml`).

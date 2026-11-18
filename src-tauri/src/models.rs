@@ -255,4 +255,6 @@ pub struct Settings {
     pub active_session_id: Option<String>,
     pub theme: String,
     pub global_shortcut_enabled: bool,
+    /// Start TimeBar when you log in (read from the OS, not the database).
+    pub launch_at_login: bool,
 }
