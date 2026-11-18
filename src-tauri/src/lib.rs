@@ -9,22 +9,34 @@ mod tray;
 
 use db::Db;
 use tauri::Manager;
-use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutState};
+use tauri_plugin_global_shortcut::{GlobalShortcutExt, ShortcutState};
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    // Cmd+Shift+T toggles the quick panel by default (configurable later, §7).
-    let toggle_shortcut = Shortcut::new(Some(Modifiers::SUPER | Modifiers::SHIFT), Code::KeyT);
+    // Cmd+Shift+T (macOS) / Ctrl+Alt+T (Windows) toggles the quick panel.
+    let toggle_shortcut = commands::settings::quick_toggle_shortcut();
 
-    tauri::Builder::default()
+    let mut builder = tauri::Builder::default();
+    // One copy at a time: launching again just opens the dashboard. Skipped
+    // when TIMEBAR_DATA_DIR is set, so a second copy can run as a separate
+    // "device" for sync testing.
+    if std::env::var_os("TIMEBAR_DATA_DIR").is_none() {
+        builder = builder.plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+            tray::open_main(app);
+        }));
+    }
+
+    builder
+        .plugin(tauri_plugin_autostart::init(
+            tauri_plugin_autostart::MacosLauncher::LaunchAgent,
+            None,
+        ))
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_positioner::init())
         .plugin(
             tauri_plugin_global_shortcut::Builder::new()
                 .with_handler(move |app, shortcut, event| {
-                    if event.state == ShortcutState::Pressed
-                        && shortcut.matches(Modifiers::SUPER | Modifiers::SHIFT, Code::KeyT)
-                    {
+                    if event.state == ShortcutState::Pressed && *shortcut == toggle_shortcut {
                         tray::toggle_quick_panel(app);
                     }
                 })
@@ -60,6 +72,7 @@ pub fn run() {
             commands::settings::get_settings,
             commands::settings::update_setting,
             commands::settings::set_global_shortcut,
+            commands::settings::set_launch_at_login,
             // export
             commands::export::export_csv,
             // windows
@@ -102,6 +115,7 @@ pub fn run() {
                 let q = quick.clone();
                 quick.on_window_event(move |event| {
                     if let tauri::WindowEvent::Focused(false) = event {
+                        tray::note_blur_hide();
                         let _ = q.hide();
                     }
                 });

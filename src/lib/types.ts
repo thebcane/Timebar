@@ -139,6 +139,7 @@ export interface Settings {
   activeSessionId: string | null;
   theme: string;
   globalShortcutEnabled: boolean;
+  launchAtLogin: boolean;
 }
 
 export interface SyncStatus {

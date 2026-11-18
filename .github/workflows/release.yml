@@ -1,0 +1,43 @@
+# Push a tag like v0.2.0 to build installers for macOS (.dmg) and Windows
+# (.msi and setup .exe). They land on a draft GitHub release for you to
+# check and publish. Builds are unsigned: macOS asks you to right-click →
+# Open the first time, and Windows SmartScreen shows "More info → Run anyway".
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - run: npm ci
+
+      - uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: ${{ github.ref_type == 'tag' && github.ref_name || 'v__VERSION__' }}
+          releaseName: TimeBar ${{ github.ref_type == 'tag' && github.ref_name || 'v__VERSION__' }}
+          releaseDraft: true

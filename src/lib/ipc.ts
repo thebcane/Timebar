@@ -129,6 +129,9 @@ export const updateSetting = (key: string, value: string) =>
 export const setGlobalShortcut = (enabled: boolean) =>
   invoke<void>("set_global_shortcut", { enabled });
 
+export const setLaunchAtLogin = (enabled: boolean) =>
+  invoke<void>("set_launch_at_login", { enabled });
+
 export const exportCsv = (range: Range, tz: string) =>
   invoke<string>("export_csv", { range, tz });
 
