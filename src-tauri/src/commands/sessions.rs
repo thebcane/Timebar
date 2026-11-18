@@ -54,7 +54,7 @@ pub async fn do_start(
     let mut tx = pool.begin().await?;
 
     // Stop whatever is running.
-    sqlx::query("UPDATE sessions SET ended_at=?, updated_at=? WHERE ended_at IS NULL AND deleted_at IS NULL")
+    sqlx::query("UPDATE sessions SET ended_at=?, updated_at=?, dirty=1 WHERE ended_at IS NULL AND deleted_at IS NULL")
         .bind(now)
         .bind(now)
         .execute(&mut *tx)
@@ -108,6 +108,7 @@ pub async fn start_task(
         .map_err(e)?
         .ok_or_else(|| "failed to load started session".to_string())?;
     emit_active_changed(&app, &db.pool).await;
+    crate::sync::nudge();
     Ok(view)
 }
 
@@ -120,7 +121,7 @@ pub async fn stop_active(app: AppHandle, db: State<'_, Db>) -> CmdResult<Option<
         return Ok(None);
     };
 
-    sqlx::query("UPDATE sessions SET ended_at=?, updated_at=? WHERE id=? AND ended_at IS NULL")
+    sqlx::query("UPDATE sessions SET ended_at=?, updated_at=?, dirty=1 WHERE id=? AND ended_at IS NULL")
         .bind(now)
         .bind(now)
         .bind(&running.id)
@@ -134,6 +135,7 @@ pub async fn stop_active(app: AppHandle, db: State<'_, Db>) -> CmdResult<Option<
 
     let view = session_view(&db.pool, &running.id).await.map_err(e)?;
     emit_active_changed(&app, &db.pool).await;
+    crate::sync::nudge();
     Ok(view)
 }
 
@@ -189,6 +191,7 @@ pub async fn create_manual_session(
     // A manual entry never changes the running session, but tree/entry views
     // may want to refresh; the active pointer is untouched.
     let _ = &app;
+    crate::sync::nudge();
     Ok(view)
 }
 
@@ -249,7 +252,7 @@ pub async fn update_session(
     s.updated_at = now_ms();
 
     sqlx::query(
-        "UPDATE sessions SET task_id=?, started_at=?, ended_at=?, note=?, rate_snapshot=?, billed=?, updated_at=? WHERE id=?",
+        "UPDATE sessions SET task_id=?, started_at=?, ended_at=?, note=?, rate_snapshot=?, billed=?, updated_at=?, dirty=1 WHERE id=?",
     )
     .bind(&s.task_id)
     .bind(s.started_at)
@@ -271,6 +274,7 @@ pub async fn update_session(
     if s.ended_at.is_none() {
         emit_active_changed(&app, &db.pool).await;
     }
+    crate::sync::nudge();
     Ok(view)
 }
 
@@ -285,7 +289,7 @@ pub async fn delete_session(app: AppHandle, db: State<'_, Db>, id: String) -> Cm
 
     // Soft delete (tombstone) so the deletion syncs across devices.
     let now = now_ms();
-    sqlx::query("UPDATE sessions SET deleted_at=?, updated_at=? WHERE id=?")
+    sqlx::query("UPDATE sessions SET deleted_at=?, updated_at=?, dirty=1 WHERE id=?")
         .bind(now)
         .bind(now)
         .bind(&id)
@@ -297,5 +301,6 @@ pub async fn delete_session(app: AppHandle, db: State<'_, Db>, id: String) -> Cm
         set_active_pointer(&db.pool, None).await.map_err(e)?;
         emit_active_changed(&app, &db.pool).await;
     }
+    crate::sync::nudge();
     Ok(())
 }

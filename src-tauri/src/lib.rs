@@ -75,7 +75,11 @@ pub fn run() {
         ])
         .setup(move |app| {
             // --- Database ------------------------------------------------
-            let data_dir = app.path().app_data_dir().expect("resolve app data dir");
+            // TIMEBAR_DATA_DIR points the app at another database, e.g. to run
+            // a second copy as a separate "device" when testing sync.
+            let data_dir = std::env::var_os("TIMEBAR_DATA_DIR")
+                .map(std::path::PathBuf::from)
+                .unwrap_or_else(|| app.path().app_data_dir().expect("resolve app data dir"));
             std::fs::create_dir_all(&data_dir).ok();
             let db_path = data_dir.join("timebar.db");
             let db = tauri::async_runtime::block_on(Db::init(&db_path)).expect("initialize database");
@@ -153,7 +157,7 @@ pub fn run() {
                                 println!("SELFTEST: start ok -> session {sid}, running rows = {running}");
                                 // Clean up so we don't leave a dangling timer.
                                 let _ = sqlx::query(
-                                    "UPDATE sessions SET ended_at=?, updated_at=? WHERE id=?",
+                                    "UPDATE sessions SET ended_at=?, updated_at=?, dirty=1 WHERE id=?",
                                 )
                                 .bind(db::now_ms())
                                 .bind(db::now_ms())

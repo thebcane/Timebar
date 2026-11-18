@@ -1,6 +1,9 @@
 -- TimeBar sync schema — paste into Supabase → SQL Editor → Run.
 -- Mirrors the local SQLite tables. Timestamps are epoch milliseconds (int8).
 -- Row-Level Security scopes every row to the signed-in user.
+--
+-- After this, also run migrations/20261118_sync_v2.sql (server_seq, server-side
+-- last-write-wins, one running timer per user). The app requires it.
 
 create table if not exists public.folders (
   id         text primary key,
